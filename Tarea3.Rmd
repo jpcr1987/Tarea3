@@ -19,6 +19,9 @@ library(broom)
 library(knitr)
 library(lubridate)
 library(RCT)
+library(dplyr)
+library(rdd)
+library(hettx)
 ```
 
 
@@ -129,14 +132,85 @@ Con base en los ejercicios de efectos mìnimos detectables, elegimos un share co
 
 ### 7. Realiza las pruebas de balance t sobre todas las variables (Tip: transforma las categóricas en dummys). Parece haber balance?  
 
+```{r Pruebas de Balance para cada grupo de tratamiento}
+#Comenzamos por crear dummies y convirtiendo variables a categoricas
+universo_dummies <- universo
+universo_dummies <- fastDummies::dummy_cols(universo, select_columns = "treat")
+universo_dummies <- mutate(universo_dummies, device_value_d = ifelse(device_value == "[$10,001+]", 1, 2))
+universo_dummies <- mutate(universo_dummies, population_d = ifelse(population == "Inactive", 1, 2))
+universo_dummies <- select (universo_dummies, -device_value, -population)
+universo_dummies$phone_verified <- as.double(universo_dummies$phone_verified)
+universo_dummies$gender_F <- as.double(universo_dummies$gender_F)
+universo_dummies <- rename(universo_dummies, device_value = device_value_d)
+universo_dummies <- rename(universo_dummies, population = population_d)
+universo_dummies$control[universo_dummies$control == 0 ] <- 1
+universo_dummies$control[is.na(universo_dummies$control)] <- 0
+
+#Ahora, creamos las tablas de balance para cada uno de los grupos de tratamiento
+universo_t1 <- select(universo_dummies, user_id, device_value, phone_verified, population, age, total_purchases, gender_F, months_since_register, tasa_transac, strata, control, treat_1)
+balance_table(universo_t1, "treat_1")
+
+universo_t2 <- select(universo_dummies, user_id, device_value, phone_verified, population, age, total_purchases, gender_F, months_since_register, tasa_transac, strata, control, treat_2)
+balance_table(universo_t2, "treat_2")
+
+universo_t3 <- select(universo_dummies, user_id, device_value, phone_verified, population, age, total_purchases, gender_F, months_since_register, tasa_transac, strata, control, treat_3)
+balance_table(universo_t3, "treat_3")
+
+universo_t4 <- select(universo_dummies, user_id, device_value, phone_verified, population, age, total_purchases, gender_F, months_since_register, tasa_transac, strata, control, treat_4)
+balance_table(universo_t4, "treat_4")
+
+universo_t5 <- select(universo_dummies, user_id, device_value, phone_verified, population, age, total_purchases, gender_F, months_since_register, tasa_transac, strata, control, treat_5)
+balance_table(universo_t5, "treat_5")
+
+universo_t6 <- select(universo_dummies, user_id, device_value, phone_verified, population, age, total_purchases, gender_F, months_since_register, tasa_transac, strata, control, treat_6)
+balance_table(universo_t6, "treat_6")
+
+universo_t7 <- select(universo_dummies, user_id, device_value, phone_verified, population, age, total_purchases, gender_F, months_since_register, tasa_transac, strata, control, treat_7)
+balance_table(universo_t7, "treat_7")
+
+```
+
+De las tablas que generamos, no parece haber buen balance en la asignación de los grupos en todas las variables. Los valores de los p-values son altos para casi todas las variables, lo que nos muestra que la diferencia de medias entre el grupo de tratamiento y el grupo control no es significativa. 
 
 ### 8. Repite el ejercicio pero ahora con pruebas de balance conjuntas. Muestra los resultados (incluyendo el estadístico de prueba, grados de libertad y p values) Interpreta
 
+```{r Pruebas de Balance Conjuntas}
+balance_regression(universo_t1, "treat_1")
+
+balance_regression(universo_t2, "treat_2")
+
+balance_regression(universo_t3, "treat_3")
+
+balance_regression(universo_t4, "treat_4")
+
+balance_regression(universo_t5, "treat_5")
+
+balance_regression(universo_t6, "treat_6")
+
+balance_regression(universo_t7, "treat_7")
+```
+
+Al observar las tablas conjuntas, podemos notar que el p-value conjunto es peque;o, por lo tanto parece haber balance en la prueba conjunta. Podemos ver que el estad[istico F es superior a 5 en todos los grupos.
 
 ### 9. Elabora porqué parecen cumplirse los 3 supuestos de la asignación
 
+Notese que la asignación realizada fue realizada de manera aleatoria, lo cual significa lo siguiente para cada supuesto:
+
+1. SUTVA: Las asignaciones al tratamiento son aleatorizadas y recibirán un tratamiento en específico, por lo tanto no es posible que exista contaminación entre grupos. Este supuesto se cumple.
+
+2. Overlap: Cada asignación tiene una probabilidad conocida por la manera en la que se realizó la asignación. Este supuesto se mantiene.
+
+3. Unconfoundness: Las asignaciones se realizaron para cada userid, por lo que otras características observables no afectan dicha asignación. Este supuesto también se mantiene.
+
+Por lo tanto, lo 3 supuestos de la asignación se cumplen. No obstante, de lo que se observó de las tablas de balance notamos que los grupos no se encuentran bien balanceados en todas las variables. Adicionalmente, los misfits fueron tratados como n/a, evitando que generaran algún desbalance a los grupos de tratamiento.
 
 ### 10. Elabora un pitch de negocio sobre los beneficios que este experimento podría dejar a Rappi. 
+
+Este experimento puede generar tres canales de beneficios a Rappi:
+
+- Incremento en la interacción de usuarios: Esto genera mayor tráfico en la aplicación. Un incremento en el tráfico de la aplicación aumenta las probabilidades de ventas y potencial para cobrar más margenes a los comercios y generar ingresos por publicidad, y además mayor interés por comercios de ofrecer sus servicios en la aplicación
+- Incremento en ventas: Un aumento en la tasa de transacción resultaría en un aumento en los ingresos de Rappi.
+- Ahorro costos: Esta campaña permite ser más efectivo con la publicidad, y por ende realizar pautas que sean más costo-efectivas. Como consecuencia aumentar los márgenes de ganancia.
 
 ## Evaluación 
 
@@ -173,7 +247,91 @@ load('Bases input/base_evaluacion.Rdata')
 
 ### 10 (2ptos). Muestra el estimador ITT para la tasa de transaccionalidad. Recuerda que tu cliente es un grupo empresarial. Por ende, muestra una gráfica donde se aprecie la diferencia entre los grupos de tratamiento y las significancias de manera sencilla. Interpreta tus resultados 
 
+```{r ITT}
+library(rdd)
 
+#Explorando la base de datos
+str(universo_f)
+summary(universo_f)
+
+#Limpiando el formato de variables:
+universo_f <- mutate(universo_f, device_value_d = ifelse(device_value == "[$10,001+]", 1, 2))
+universo_f <- select (universo_f, -device_value)
+universo_f <- rename(universo_f, device_value = device_value_d)
+
+#Preparando una sub base para cada ITT: 
+universo_control <- subset(universo_f, treat2=="Control")
+universo_t11 <- subset(universo_f, treat==1 | treat==0 )
+universo_t21 <- subset(universo_f, treat==2 | treat==0 )
+universo_t21$treat[universo_t21$treat==2] <- 1
+universo_t31 <- subset(universo_f, treat==3 | treat==0 )
+universo_t31$treat[universo_t31$treat==3] <- 1
+universo_t41 <- subset(universo_f, treat==4 | treat==0 )
+universo_t41$treat[universo_t41$treat==4] <- 1
+universo_t51 <- subset(universo_f, treat==5 | treat==0 )
+universo_t51$treat[universo_t51$treat==5] <- 1
+universo_t61 <- subset(universo_f, treat==6 | treat==0 )
+universo_t61$treat[universo_t61$treat==6] <- 1
+
+#Estimando el ITT (libreria rct)
+itt_1 <- impact_eval(data = universo_t11,
+                   endogenous_vars = "transacted",
+                   treatment = "treat",
+                   control_vars = c("phone_verified", "population", "device_value"))
+itt_1
+
+itt_2 <- impact_eval(data = universo_t21,
+                   endogenous_vars = "transacted",
+                   treatment = "treat",
+                   control_vars = c("phone_verified", "population", "device_value"))
+itt_2
+
+itt_3 <- impact_eval(data = universo_t31,
+                   endogenous_vars = "transacted",
+                   treatment = "treat",
+                   control_vars = c("phone_verified", "population", "device_value"))
+itt_3
+
+itt_4 <- impact_eval(data = universo_t41,
+                   endogenous_vars = "transacted",
+                   treatment = "treat",
+                   control_vars = c("phone_verified", "population", "device_value"))
+itt_4
+
+itt_5 <- impact_eval(data = universo_t51,
+                   endogenous_vars = "transacted",
+                   treatment = "treat",
+                   control_vars = c("phone_verified", "population", "device_value"))
+itt_5
+
+itt_6 <- impact_eval(data = universo_t61,
+                   endogenous_vars = "transacted",
+                   treatment = "treat",
+                   control_vars = c("phone_verified", "population", "device_value"))
+itt_6
+
+
+#Estimando el ITT con HETTX (paquete que estima ITT)
+library(hettx)
+itt_t11 <- estimate_systematic(transacted ~ treat, interaction.formula = ~ phone_verified + population + device_value, data = universo_t11)
+itt_t11
+
+itt_t21 <- estimate_systematic(transacted ~ treat, interaction.formula = ~ phone_verified + population + device_value, data = universo_t21)
+itt_t21
+
+itt_t31 <- estimate_systematic(transacted ~ treat, interaction.formula = ~ phone_verified + population + device_value, data = universo_t31)
+itt_t31
+
+itt_t41 <- estimate_systematic(transacted ~ treat, interaction.formula = ~ phone_verified + population + device_value, data = universo_t41)
+itt_t41
+
+itt_t51 <- estimate_systematic(transacted ~ treat, interaction.formula = ~ phone_verified + population + device_value, data = universo_t51)
+itt_t51
+
+itt_t61 <- estimate_systematic(transacted ~ treat, interaction.formula = ~ phone_verified + population + device_value, data = universo_t61)
+itt_t61
+
+```
 
 ### 11. Repite el ejercicio sobre compras totales. Que resultados se aprecian? Que indica esto sobre la rentabilidad del sistema de incentivos? 
 
